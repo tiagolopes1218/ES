@@ -1,44 +1,37 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth.models import User
-from rest_framework import status
-from .models import LoanRequest
-from django.core.exceptions import ValidationError
-
-class LoginView(APIView):
-    def post(self, request):
-        username = request.data.get("username")
-        password = request.data.get("password")
-        if not username or not password:
-            return Response({"error": "Username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        user = User.objects.filter(username=username).first()
-        if user and user.check_password(password):
-            token = RefreshToken.for_user(user)
-            return Response({"token": str(token.access_token)})
-        return Response({"error": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
 class LoanSimulationView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        amount = request.data.get("amount")
-        duration = request.data.get("duration")
-
         try:
-            amount = float(amount)
-            duration = int(duration)
+            # Verifica os dados recebidos
+            amount = float(request.data.get("amount", 0))
+            duration = int(request.data.get("duration", 0))
 
-            # Lógica de avaliação do empréstimo
-            if amount <= 5000 and duration <= 12:
-                status = "Aprovado"
-            elif amount > 5000 and amount <= 20000 and duration <= 36:
-                status = "Marcação de Entrevista"
+            # Validações básicas
+            if not amount or not duration:
+                return Response(
+                    {"error": "Dados incompletos. Certifique-se de preencher todos os campos."},
+                    status=400
+                )
+
+            if amount <= 0 or duration <= 0:
+                return Response(
+                    {"error": "Valores inválidos. 'amount' e 'duration' devem ser maiores que zero."},
+                    status=400
+                )
+
+            # Lógica da simulação (exemplo simples)
+            if amount <= 100000 and duration <=12:
+                result = f"Aprovado para {amount} em {duration} meses."
+            elif amount > 100000 and amount < 1000000 and duration <=36:
+                result = f"Marcação de Entrevista"
             else:
-                status = "Recusado"
+                result = f"Reprovado"
+            return Response({"result": result})
 
-            return Response({"status": status, "amount": amount, "duration": duration})
-        except (ValueError, TypeError):
-            return Response({"error": "Dados inválidos. Certifique-se de enviar valores numéricos."}, status=400)
+        except ValueError:
+            return Response({"error": "Formato inválido. 'amount' e 'duration' devem ser numéricos."}, status=400)

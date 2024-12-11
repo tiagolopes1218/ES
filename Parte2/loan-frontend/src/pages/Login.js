@@ -9,9 +9,9 @@ const Login = () => {
   
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-
+    
     // Verifica se as credenciais são válidas
     const storedPassword = localStorage.getItem(username);
     
@@ -63,7 +63,7 @@ const Login = () => {
       </form>
       {error && <p style={{ color: "red", marginTop: "10px" }}>{error}</p>}
 
-      {/* Link para a página de registro */}
+      {/*Link para a página de registro*/ }
       <p style={{ marginTop: "20px" }}>
         Ainda não tem uma conta?{" "}
         <Link to="/register" style={{ color: "#007BFF" }}>

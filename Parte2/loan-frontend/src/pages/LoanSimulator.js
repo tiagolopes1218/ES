@@ -8,25 +8,35 @@ const LoanSimulator = () => {
   const [error, setError] = useState("");
 
   const handleSimulate = async (e) => {
-    e.preventDefault();
-    setError("");
-    setResponse(null);
+  e.preventDefault();
 
-    try {
-      const res = await axios.post(
-        "http://127.0.0.1:8000/api/simulate/", // URL do backend
-        { amount, duration },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`, // Token do login
-          },
-        }
-      );
-      setResponse(res.data);
-    } catch (err) {
-      setError("Erro na simulação. Verifique os dados ou tente novamente.");
+  const token = localStorage.getItem("token");
+  if (!token) {
+    alert("Usuário não autenticado. Faça login novamente.");
+    return;
+  }
+
+  try {
+    const response = await axios.post(
+      "http://localhost:8000/api/simulate/",
+      { amount, duration },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    alert(`Resultado da Simulação: ${response.data.result}`);
+  } catch (error) {
+    console.error(error);
+    if (error.response) {
+      alert(`Erro na simulação: ${error.response.data.error || "Desconhecido"}`);
+    } else {
+      alert("Erro de rede ou servidor indisponível.");
     }
-  };
+  }
+};
 
   return (
     <div style={{ textAlign: "center", padding: "20px" }}>
