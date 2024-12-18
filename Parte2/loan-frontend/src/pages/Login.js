@@ -1,25 +1,55 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Link } from "react-router-dom"; // Importe o Link
+import axios from "axios";
 
 const Login = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  
+
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Verifica se as credenciais são válidas
-    const storedPassword = localStorage.getItem(username);
-    
-    if (storedPassword && storedPassword === password) {
-      setError("");
-      navigate("/simulator"); // Redireciona para a página do simulador
-    } else {
-      setError("Credenciais inválidas. Tente novamente.");
+
+    // Validação básica
+    if (!username || !password) {
+      setError("Preencha todos os campos.");
+      return;
+    }
+
+    try {
+      console.log("Enviando credenciais:", { username, password });
+
+      // Requisição correta para obter o token
+      const response = await axios.post("http://localhost:8000/api/token/", {
+        username,
+        password,
+      });
+
+      console.log("Resposta da API:", response);
+
+      // Extrai o token da resposta
+      const { access, refresh } = response.data;
+
+      if (access) {
+        console.log("Token de acesso recebido:", access);
+        // Armazena o token no localStorage
+        localStorage.setItem("token", access);
+        localStorage.setItem("refreshToken", refresh);
+        setError("");
+        navigate("/simulator"); // Redireciona para o simulador
+      } else {
+        setError("Autenticação falhou. Token não recebido.");
+      }
+    } catch (error) {
+      console.error("Erro ao enviar login:", error);
+
+      if (error.response) {
+        setError(error.response.data.detail || "Credenciais inválidas.");
+      } else {
+        setError("Erro de rede ou servidor indisponível.");
+      }
     }
   };
 
@@ -62,14 +92,7 @@ const Login = () => {
         </button>
       </form>
       {error && <p style={{ color: "red", marginTop: "10px" }}>{error}</p>}
-
-      {/*Link para a página de registro*/ }
-      <p style={{ marginTop: "20px" }}>
-        Ainda não tem uma conta?{" "}
-        <Link to="/register" style={{ color: "#007BFF" }}>
-          Criar uma conta
-        </Link>
-      </p>
+      
     </div>
   );
 };
