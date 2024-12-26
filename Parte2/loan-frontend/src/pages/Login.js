@@ -1,66 +1,73 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useRef } from "react";
+import Webcam from "react-webcam";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 const Login = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-
+  const [message, setMessage] = useState("");
+  const webcamRef = useRef(null);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  // Login tradicional com nome de utilizador e senha
+  const handleTraditionalLogin = async (e) => {
     e.preventDefault();
 
-    // Validação básica
     if (!username || !password) {
-      setError("Preencha todos os campos.");
+      setError("Por favor, preencha todos os campos.");
       return;
     }
 
     try {
-      console.log("Enviando credenciais:", { username, password });
-
-      // Requisição correta para obter o token
       const response = await axios.post("http://localhost:8000/api/token/", {
         username,
         password,
       });
 
-      console.log("Resposta da API:", response);
-
-      // Extrai o token da resposta
       const { access, refresh } = response.data;
+      localStorage.setItem("token", access);
+      localStorage.setItem("refreshToken", refresh);
+      setError("");
+      navigate("/simulator");
+    } catch (err) {
+      setError("Credenciais inválidas. Por favor, tente novamente.");
+    }
+  };
 
-      if (access) {
-        console.log("Token de acesso recebido:", access);
-        // Armazena o token no localStorage
-        localStorage.setItem("token", access);
-        localStorage.setItem("refreshToken", refresh);
-        setError("");
-        navigate("/simulator"); // Redireciona para o simulador
-      } else {
-        setError("Autenticação falhou. Token não recebido.");
-      }
-    } catch (error) {
-      console.error("Erro ao enviar login:", error);
+  // Login com reconhecimento facial
+  const handleFaceLogin = async () => {
+    const imageSrc = webcamRef.current.getScreenshot();
+    if (!imageSrc) {
+      setMessage("Por favor, capture uma imagem antes de continuar.");
+      return;
+    }
 
-      if (error.response) {
-        setError(error.response.data.detail || "Credenciais inválidas.");
-      } else {
-        setError("Erro de rede ou servidor indisponível.");
-      }
+    try {
+      const response = await axios.post("http://localhost:8000/api/face-login/", {
+        image: imageSrc.split(",")[1], // Remove o prefixo "data:image/jpeg;base64,"
+      });
+
+      const { access, refresh } = response.data;
+      localStorage.setItem("token", access);
+      localStorage.setItem("refreshToken", refresh);
+      setMessage("Rosto reconhecido. Login efetuado com sucesso!");
+      navigate("/simulator");
+    } catch (err) {
+      setMessage(err.response?.data?.error || "Falha ao reconhecer o rosto. Tente novamente.");
     }
   };
 
   return (
     <div style={{ textAlign: "center", padding: "20px" }}>
       <h1>Login</h1>
-      <form onSubmit={handleSubmit}>
+
+      <form onSubmit={handleTraditionalLogin}>
         <div>
           <input
             type="text"
-            placeholder="Usuário"
+            placeholder="Nome de utilizador"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
@@ -88,11 +95,33 @@ const Login = () => {
             cursor: "pointer",
           }}
         >
-          Entrar
+          Login
         </button>
       </form>
       {error && <p style={{ color: "red", marginTop: "10px" }}>{error}</p>}
-      
+
+      <h2>Ou faça login com reconhecimento facial</h2>
+      <Webcam
+        audio={false}
+        screenshotFormat="image/jpeg"
+        width={320}
+        ref={webcamRef}
+        style={{ marginBottom: "10px" }}
+      />
+      <button
+        onClick={handleFaceLogin}
+        style={{
+          padding: "10px 20px",
+          backgroundColor: "#28a745",
+          color: "#fff",
+          border: "none",
+          borderRadius: "5px",
+          cursor: "pointer",
+        }}
+      >
+        Login com Reconhecimento Facial
+      </button>
+      {message && <p style={{ marginTop: "10px", color: message.includes("sucesso") ? "green" : "red" }}>{message}</p>}
     </div>
   );
 };
