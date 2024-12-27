@@ -18,3 +18,12 @@ class LoanRequest(models.Model):
 
     def __str__(self):
         return f"LoanRequest(user={self.user.username}, amount={self.amount}, status={self.status})"
+    
+class UploadedDocument(models.Model):
+    loan_request = models.ForeignKey('LoanRequest', on_delete=models.CASCADE, related_name='documents')
+    file_path = models.CharField(max_length=255)
+    caption = models.CharField(max_length=255, blank=True, null=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.caption or 'Sem legenda'} ({self.file_path})"

@@ -2,9 +2,14 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404
 from .models import LoanRequest
 from datetime import datetime
+import boto3
+import base64
+import os
 
 # Simulação de Empréstimo
 class LoanSimulationView(APIView):
@@ -48,6 +53,31 @@ class LoanSimulationView(APIView):
                 {"error": "Formato inválido. 'amount' e 'duration' devem ser numéricos."},
                 status=400
             )
+
+class FaceRecognitionView(APIView):
+    def post(self, request):
+        image_data = request.data.get("image")
+        if not image_data:
+            return Response({"error": "No image provided"}, status=400)
+
+        # Decodificar a imagem base64
+        image_bytes = base64.b64decode(image_data)
+
+        # Configuração do cliente Rekognition
+        client = boto3.client('rekognition', region_name='us-west-2')
+        response = client.search_faces_by_image(
+            CollectionId='users_faces',
+            Image={'Bytes': image_bytes},
+            MaxFaces=1,
+            FaceMatchThreshold=90
+        )
+
+        if response['FaceMatches']:
+            # Obter o ID do utilizador associado à face
+            user_id = response['FaceMatches'][0]['Face']['ExternalImageId']
+            return Response({"message": "Face recognized", "user_id": user_id}, status=200)
+        else:
+            return Response({"error": "Face not recognized"}, status=401)
 
 
 # Submissão de Pedido de Empréstimo
@@ -93,3 +123,72 @@ def check_loan_status(request, loan_id):
         "created_at": loan.created_at.strftime('%Y-%m-%d %H:%M:%S'),
         "updated_at": loan.updated_at.strftime('%Y-%m-%d %H:%M:%S')
     })
+
+class FaceLoginAPIView(APIView):
+    def post(self, request):
+        image_data = request.data.get("image")
+        if not image_data:
+            return Response({"error": "No image provided"}, status=400)
+
+        # Decodificar a imagem base64
+        image_bytes = base64.b64decode(image_data)
+
+        # Configuração do cliente Rekognition
+        client = boto3.client('rekognition', region_name='us-west-2')
+        response = client.search_faces_by_image(
+            CollectionId='users_faces',
+            Image={'Bytes': image_bytes},
+            MaxFaces=1,
+            FaceMatchThreshold=90
+        )
+
+        if response['FaceMatches']:
+            # Obter o ID do utilizador associado à face
+            user_id = response['FaceMatches'][0]['Face']['ExternalImageId']
+            try:
+                user = User.objects.get(id=user_id)
+                refresh = RefreshToken.for_user(user)
+                return Response({
+                    "message": "Authenticated successfully.",
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh)
+                })
+            except User.DoesNotExist:
+                return Response({"error": "User not found."}, status=404)
+        else:
+            return Response({"error": "Face not recognized."}, status=401)
+        
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_document(request):
+    try:
+        # Recebe o ID do pedido de empréstimo e o arquivo
+        loan_id = request.data.get('loan_id')
+        file = request.FILES.get('file')
+
+        # Validação do ID
+        if not loan_id:
+            return Response({"error": "ID do pedido não fornecido."}, status=400)
+
+        # Verificar se o pedido existe para o usuário autenticado
+        loan_request = get_object_or_404(LoanRequest, id=loan_id, user=request.user)
+
+        if not file:
+            return Response({"error": "Nenhum arquivo enviado."}, status=400)
+
+        # Criar diretório baseado no ID
+        upload_dir = os.path.join('uploads', str("ID "+loan_id))
+        os.makedirs(upload_dir, exist_ok=True)
+
+        # Caminho final para salvar o arquivo
+        file_path = os.path.join(upload_dir, file.name)
+
+        # Salvar o arquivo
+        with open(file_path, 'wb') as destination:
+            for chunk in file.chunks():
+                destination.write(chunk)
+
+        return Response({"message": "Documento enviado com sucesso!", "file_path": file_path})
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)

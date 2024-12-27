@@ -9,6 +9,7 @@ const LoanSimulator = () => {
   const [loanId, setLoanId] = useState(null);
   const [loanStatus, setLoanStatus] = useState(null);
   const [loanIdInput, setLoanIdInput] = useState("");
+  const [file, setFile] = useState(null);
 
   const navigate = useNavigate(); // Hook para navegação
 
@@ -63,6 +64,33 @@ const LoanSimulator = () => {
       alert("Erro ao verificar o status do pedido.");
     }
   };
+  
+  const [uploadLoanId, setUploadLoanId] = useState("");
+
+  const handleUploadDocument = async () => {
+    if (!file) return alert("Por favor, selecione um arquivo.");
+    if (!uploadLoanId) return alert("Por favor, informe o ID do pedido de empréstimo.");
+
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Usuário não autenticado. Faça login.");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("loan_id", uploadLoanId);
+
+    try {
+      const response = await axios.post("http://localhost:8000/api/upload/", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      alert("Documento enviado com sucesso!");
+    } catch (error) {
+      console.error(error.response);
+      alert("Erro ao enviar o documento.");
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("token"); // Remove o token
@@ -76,6 +104,8 @@ const LoanSimulator = () => {
     navigate("/login"); // Redireciona para a página de login
   };
 
+  const monthlyInstallment = amount && duration ? (amount / duration).toFixed(2) : "-";
+  
   return (
     <div style={{ textAlign: "center", padding: "20px" }}>
       <h1>Simulador de Empréstimos</h1>
@@ -98,6 +128,11 @@ const LoanSimulator = () => {
         />
         <button type="submit">Simular</button>
       </form>
+
+      <div>
+        <h3>Parcela Mensal:</h3>
+        <p>€{monthlyInstallment}</p>
+      </div>
 
       {simulationResult && (
         <div>
@@ -132,6 +167,19 @@ const LoanSimulator = () => {
           <p>Atualizado em: {loanStatus.updated_at}</p>
         </div>
       )}
+
+      {/* Upload de Documento */}
+      <div style={{ marginTop: "20px" }}>
+        <h3>Enviar Documento</h3>
+        <input type="file" onChange={(e) => setFile(e.target.files[0])} />
+        <input
+          type="number"
+          placeholder="ID do Pedido de Empréstimo"
+          value={uploadLoanId}
+          onChange={(e) => setUploadLoanId(e.target.value)}
+        />
+        <button onClick={handleUploadDocument}>Enviar Documento</button>
+      </div>
 
       {/* Logout */}
       <button
